@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     xai_api_base: str = ""  # override for an OpenAI-compatible gateway (e.g. aimlapi.com)
     brief_user_id: str = "default"
     brief_owner_name: str = ""  # Donna addresses the reader by this name if set
+    brief_morning_hour: int = 6  # brief-web auto-runs once per day at/after this local hour
     data_dir: str = "data"
     google_client_secrets: str = "credentials.json"
     google_token_file: str = "data/google_token.json"

@@ -16,12 +16,19 @@ pytest
 pip install -e ".[web]" && brief-web   # http://127.0.0.1:8765 — watch the DAG run
 ```
 
-`brief-web` serves **Donna** ([`assistant/web/index.html`](src/assistant/web/index.html)), a
-one-page explainer. Left: today's brief as themed cards with links folded into the card
-they belong to. Right: the actual compiled LangGraph (`get_graph()` → `/api/graph`),
-nodes grouped into 6 named stages, animating as `GET /api/run` streams the run over SSE.
-Click any node for its inputs/outputs and discards. Vanilla JS + `EventSource`, no build
-step; theme is blush/coral, Libre Bodoni + Public Sans (Google Fonts).
+`brief-web` serves **Donna** ([`assistant/web/index.html`](src/assistant/web/index.html)).
+The page is the brief: greeting, three groups (Needs you / Good to know / In AI news),
+sign-off, all in Donna's voice, links folded into the item they relate to. Below it, a
+compact 6-stage stepper over the real compiled graph (`get_graph()` → `/api/graph`);
+click a stage for its node detail and discards.
+
+**Caching + schedule.** The page loads the last run from `data/brief_cache.json` via
+`GET /api/last` (never triggers work). The graph runs once per day at/after
+`BRIEF_MORNING_HOUR` (a scheduler thread in `main()`), or on demand via `GET /api/run`
+(SSE, node-by-node, one at a time). Both paths go through `_execute()`, which writes the
+cache. Set `BRIEF_OWNER_NAME` so Donna uses your name.
+
+Vanilla JS + `EventSource`, no build step; blush/coral theme, Libre Bodoni + Public Sans.
 
 `BRIEF_REPLAY=path/to/run.sse brief-web` replays a captured stream instead of running
 the graph — iterate on the UI without spending LLM credits. Capture one with

@@ -50,6 +50,9 @@
 
   .empty { font-family:var(--serif); font-style:italic; color:var(--muted); font-size:18px;
            padding:30px 0 50px; }
+  #freshness { font-size:12px; color:var(--muted); margin:0 0 8px; display:flex; gap:8px;
+               align-items:center; }
+  #freshness .stale { color:var(--coral-700); font-weight:600; }
 
   /* groups */
   .grp { margin-bottom:34px; }
@@ -135,6 +138,7 @@
     <button id="run">Run brief</button>
   </header>
 
+  <div id="freshness"></div>
   <div id="brief">
     <div class="empty">Nothing yet. Press <b>Run&nbsp;brief</b> and I’ll pull one together.</div>
   </div>
@@ -328,6 +332,37 @@ async function loadGraph() {
     renderStepper();
   } catch (e) { addLog("could not load graph: " + e, true); }
 }
+
+function applyConfig(c) {
+  if (!c || !c.llm) return;
+  $("#status").classList.toggle("live", !!c.xai_api_key);
+  $("#statuspop").innerHTML =
+    `${esc(c.llm)}<br>API key ${c.xai_api_key ? "set" : "missing"}<br>Google ${c.google_token ? "connected" : "off"}`;
+}
+
+function freshnessLine(cache) {
+  const el = $("#freshness");
+  if (!cache || !cache.brief) { el.innerHTML = ""; return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const gen = cache.generated_at ? new Date(cache.generated_at) : null;
+  const time = gen ? gen.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "";
+  el.innerHTML = cache.date === today
+    ? `Delivered this morning${time ? " at " + time : ""}.`
+    : `<span class="stale">From ${cache.date}.</span> Press “Run again” for today.`;
+}
+
+async function loadLast() {
+  try {
+    const cache = await (await fetch("/api/last")).json();
+    if (!cache || !cache.brief) return;
+    S = { d:{}, running:null, brief:cache.brief, sel:null, logs:0 };
+    (cache.steps || []).forEach(s => { S.d[s.node] = s.delta || {}; });
+    applyConfig(cache.config);
+    freshnessLine(cache);
+    $("#run").textContent = "Run again";
+    renderStepper(); renderBrief();
+  } catch (e) { addLog("could not load cached brief: " + e, true); }
+}
 function finish(msg, err) {
   S.running = null; $("#run").disabled = false;
   if (es) { es.close(); es = null; }
@@ -337,6 +372,7 @@ $("#run").onclick = () => {
   if (es) es.close();
   S = { d:{}, running:NODE_ORDER[0], brief:null, sel:null, logs:0 };
   $("#log").innerHTML = ""; $("#logcount").textContent = "";
+  $("#freshness").innerHTML = "";
   $("#brief").innerHTML = `<div class="empty">Working on it…</div>`;
   $("#inspector").style.display = "none";
   $("#run").disabled = true;
@@ -345,9 +381,7 @@ $("#run").onclick = () => {
 
   es.addEventListener("config", e => {
     const c = JSON.parse(e.data);
-    $("#status").classList.toggle("live", c.xai_api_key);
-    $("#statuspop").innerHTML =
-      `${esc(c.llm)}<br>API key ${c.xai_api_key ? "set" : "missing"}<br>Google ${c.google_token ? "connected" : "off"}`;
+    applyConfig(c);
     addLog("config · " + c.llm);
   });
   es.addEventListener("step", e => {
@@ -364,11 +398,17 @@ $("#run").onclick = () => {
     let m = "stream error"; try { m = JSON.parse(e.data).message; } catch {}
     addLog(m, true); $("#log").classList.add("open");
   });
-  es.addEventListener("done", () => { renderBrief(); finish("done"); });
+  es.addEventListener("done", () => {
+    renderBrief(); finish("done");
+    $("#run").textContent = "Run again";
+    freshnessLine({ brief: S.brief, date: new Date().toISOString().slice(0, 10),
+                    generated_at: new Date().toISOString() });
+  });
   es.onerror = () => { if (es && es.readyState === 2) finish("connection closed", true); };
 };
 
 loadGraph();
+loadLast();
 </script>
 </body>
 </html>

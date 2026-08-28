@@ -6,10 +6,12 @@ from assistant import server
 from assistant.llm import HeuristicLLM
 
 
-def test_run_stream_covers_every_node(monkeypatch):
+def test_run_stream_covers_every_node_and_writes_cache(monkeypatch, tmp_path):
     # conftest blocks Google; also pin the LLM and skip live news + disk
+    cache = tmp_path / "brief_cache.json"
     monkeypatch.setattr(server, "_hydrate", lambda *a, **k: None)
     monkeypatch.setattr(server, "_snapshot", lambda *a, **k: None)
+    monkeypatch.setattr(server, "_cache_path", lambda: cache)
     monkeypatch.setattr(server, "build_llm", lambda: HeuristicLLM())
     monkeypatch.setattr("assistant.nodes.fetch_news", lambda as_of: ([], []))
 
@@ -24,6 +26,15 @@ def test_run_stream_covers_every_node(monkeypatch):
     assert events[0] == "config"
     assert events[-1] == "done"
     assert {"load_memory", "normalize", "compose", "persist"} <= nodes
+
+    saved = json.loads(cache.read_text())
+    assert saved["brief"]["headline"] and saved["steps"]
+    assert TestClient(server.app).get("/api/last").json()["brief"] == saved["brief"]
+
+
+def test_last_is_empty_without_a_run(monkeypatch, tmp_path):
+    monkeypatch.setattr(server, "_cache_path", lambda: tmp_path / "none.json")
+    assert TestClient(server.app).get("/api/last").json() == {}
 
 
 def test_graph_endpoint_returns_compiled_structure():
