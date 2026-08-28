@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -10,10 +9,11 @@ from langgraph.runtime import Runtime
 from assistant.config import get_settings
 from assistant.guardrails import pack_compose, pack_prioritize, rule_filter
 from assistant.llm import BriefLLM, describe_llm
+from assistant.logs import logger
 
 
 def _log(step: str, msg: str) -> None:
-    print(f"[dag] {step}: {msg}", file=sys.stderr)
+    logger.info("%s: %s", step, msg)
 from assistant.memory import load_memory_view, persist_brief, seed_defaults
 from assistant.models import BriefItem
 from assistant.sources.calendar import fetch_upcoming_events

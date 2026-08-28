@@ -12,7 +12,14 @@ brief-auth             # optional: one-time Google consent for Gmail + Calendar
 brief
 # or: python -m assistant.cli
 pytest
+
+pip install -e ".[web]" && brief-web   # http://127.0.0.1:8765 — watch the DAG run
 ```
+
+`brief-web` serves one page ([`assistant/web/index.html`](src/assistant/web/index.html)):
+`GET /api/run` streams the graph over SSE (`stream_mode="updates"`), so each node
+lights up as it finishes, its output is shown, and the `[dag]` log tails live.
+No build step — vanilla JS, `EventSource`.
 
 All keys live in `.env` at the repo root (`cp .env.example .env`, then edit). Each run
 prints a `[dag] ...` trace to stderr showing the LLM, which endpoint, and per-source
@@ -47,6 +54,8 @@ No token → `brief` still runs; email/calendar just come back empty.
 | `src/assistant/sources/calendar.py` | Calendar: `primary` events in the next 24h |
 | `src/assistant/sources/news.py` | OpenAI RSS, Google Developers RSS (AI-only), Anthropic/Meta HTML |
 | `src/assistant/cli.py` | Entry + `data/memory.json` snapshot |
+| `src/assistant/server.py` | `brief-web`: FastAPI + SSE stream of the run |
+| `src/assistant/logs.py` | One `assistant` logger; CLI → stderr, web → SSE |
 | `src/assistant/config.py` | Budgets, feed list, settings |
 | `tests/` | Mirrors the above; graph tests mock live news |
 
@@ -66,3 +75,4 @@ No token → `brief` still runs; email/calendar just come back empty.
 - More news: append `NEWS_FEEDS` in `config.py`.
 - Chat/agent: new graph that **reads** the store; do not turn this DAG into ReAct.
 - Delivery: Slack/email after `persist`, not inside Grok.
+- Frontend: consume the `/api/run` SSE stream; keep run logic in `server.py`.

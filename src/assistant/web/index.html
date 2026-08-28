@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Personal Brief — run</title>
+<style>
+  :root { color-scheme: dark; --bg:#0f1216; --panel:#171c22; --line:#262d36;
+          --fg:#dfe6ee; --dim:#8b97a4; --ok:#4ade80; --run:#fbbf24; --err:#f87171; --acc:#60a5fa; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex;
+           gap:14px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; font-weight:600; }
+  button { background:var(--acc); color:#06121f; border:0; border-radius:6px;
+           padding:7px 16px; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .cfg { color:var(--dim); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; }
+  .cfg b { color:var(--fg); font-weight:500; }
+  main { display:grid; grid-template-columns:230px 1fr; gap:0; height:calc(100vh - 120px); }
+  #steps { border-right:1px solid var(--line); overflow:auto; padding:10px; }
+  .step { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:6px;
+          cursor:pointer; color:var(--dim); }
+  .step:hover { background:var(--panel); }
+  .step.sel { background:var(--panel); color:var(--fg); }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; }
+  .step.done .dot { background:var(--ok); }
+  .step.run .dot { background:var(--run); animation:pulse 1s infinite; }
+  .step.done { color:var(--fg); }
+  @keyframes pulse { 50% { opacity:.35; } }
+  #detail { overflow:auto; padding:16px 18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+          padding:14px; margin-bottom:14px; }
+  .card h2 { margin:0 0 8px; font-size:13px; color:var(--dim); font-weight:600;
+             text-transform:uppercase; letter-spacing:.04em; }
+  pre { margin:0; white-space:pre-wrap; word-break:break-word; font:12px/1.5
+        ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--fg); }
+  .brief h3 { margin:0 0 4px; font-size:16px; }
+  .brief ul { margin:4px 0 12px; padding-left:18px; }
+  #log { border-top:1px solid var(--line); height:120px; overflow:auto; padding:8px 14px;
+         background:#0b0e12; font:12px/1.45 ui-monospace,Menlo,monospace; color:var(--dim); }
+  #log .l { white-space:pre-wrap; }
+  #log .err { color:var(--err); }
+  .pill { font-size:11px; padding:1px 7px; border-radius:99px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Personal Brief</h1>
+  <button id="run">Run brief</button>
+  <div class="cfg" id="cfg"></div>
+</header>
+<main>
+  <div id="steps"></div>
+  <div id="detail"><div class="card"><h2>Idle</h2><pre>Click “Run brief”.</pre></div></div>
+</main>
+<div id="log"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const stepsEl = $("#steps"), detailEl = $("#detail"), logEl = $("#log"), cfgEl = $("#cfg");
+let deltas = {}, selected = null, order = [];
+
+function renderSteps() {
+  stepsEl.innerHTML = "";
+  for (const n of order) {
+    const d = document.createElement("div");
+    d.className = "step " + (deltas[n] !== undefined ? "done " : "") +
+                  (n === runningNode ? "run " : "") + (n === selected ? "sel" : "");
+    d.innerHTML = `<span class="dot"></span><span>${n}</span>`;
+    d.onclick = () => { selected = n; renderSteps(); renderDetail(); };
+    stepsEl.appendChild(d);
+  }
+}
+
+function line(k, v) { return `${k}: ${v}\n`; }
+
+function summarize(node, delta) {
+  const sr = delta.source_results || {};
+  for (const key of Object.keys(sr)) {
+    const items = sr[key].items || [];
+    return line("ok", sr[key].ok) + line("items", items.length) +
+           items.map(i => " • " + i.title).join("\n");
+  }
+  if (delta.memory_view) {
+    const m = delta.memory_view;
+    return line("profile", m.profile || "(none)") +
+           line("max_items", m.policy?.max_items) +
+           line("open_loops", (m.open_loops || []).length) +
+           line("seen_ids", (m.seen_ids || []).length);
+  }
+  if (delta.items) return line("normalized items", delta.items.length) +
+    delta.items.map(i => ` • [${i.source}] ${i.title}`).join("\n");
+  if (delta.candidates) return line("candidates", delta.candidates.length) +
+    delta.candidates.map(i => ` • [${i.source}] ${i.title}`).join("\n");
+  if (delta.prioritize_pack) return line("cards to ranker", delta.prioritize_pack.length);
+  if (delta.ranked) return delta.ranked
+    .map(r => ` ${r.include ? "✓" : "·"} ${r.item_id}  score=${r.score.toFixed(2)}  ${r.reason}`)
+    .join("\n") || "(nothing to rank)";
+  if (delta.compose_pack) return line("winners", (delta.compose_pack.winners || []).length) +
+    line("open_loops", (delta.compose_pack.open_loops || []).length);
+  if (delta.brief === null || delta.brief) return "";
+  return JSON.stringify(delta, null, 2);
+}
+
+function renderDetail() {
+  const cards = [];
+  const b = lastBrief;
+  if (b) {
+    let h = `<div class="card brief"><h2>Brief — status ${b.status}</h2><h3>${b.headline}</h3>`;
+    for (const s of b.sections || []) {
+      h += `<div><strong>${s.title}</strong><ul>` +
+           (s.bullets || []).map(x => `<li>${x}</li>`).join("") + `</ul></div>`;
+    }
+    cards.push(h + `</div>`);
+  }
+  const n = selected;
+  if (n && deltas[n] !== undefined) {
+    cards.push(`<div class="card"><h2>${n}</h2><pre>${escapeHtml(summarize(n, deltas[n]))}</pre></div>`);
+    cards.push(`<div class="card"><h2>${n} — raw delta</h2><pre>${escapeHtml(JSON.stringify(deltas[n], null, 2))}</pre></div>`);
+  }
+  detailEl.innerHTML = cards.join("") ||
+    `<div class="card"><h2>Waiting</h2><pre>Streaming…</pre></div>`;
+}
+
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c])); }
+
+function log(msg, cls) {
+  const d = document.createElement("div");
+  d.className = "l " + (cls || "");
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+let runningNode = null, lastBrief = null, es = null;
+
+$("#run").onclick = () => {
+  if (es) es.close();
+  deltas = {}; selected = null; runningNode = null; lastBrief = null;
+  logEl.innerHTML = ""; $("#run").disabled = true;
+  es = new EventSource("/api/run");
+
+  es.addEventListener("config", e => {
+    const c = JSON.parse(e.data);
+    order = c.nodes; renderSteps(); renderDetail();
+    cfgEl.innerHTML =
+      `<span><b>LLM</b> ${c.llm}</span>` +
+      `<span class="pill">XAI_API_KEY ${c.xai_api_key ? "set" : "unset"}</span>` +
+      `<span class="pill">endpoint ${c.xai_api_base}</span>` +
+      `<span class="pill">Google token ${c.google_token ? "found" : "missing"}</span>`;
+    log("config: llm=" + c.llm);
+  });
+
+  es.addEventListener("step", e => {
+    const { node, delta } = JSON.parse(e.data);
+    deltas[node] = delta;
+    if (delta.brief) lastBrief = delta.brief;
+    const i = order.indexOf(node);
+    runningNode = order[i + 1] || null;
+    if (!selected) selected = node;
+    renderSteps(); renderDetail();
+  });
+
+  es.addEventListener("log", e => log(JSON.parse(e.data)));
+  es.addEventListener("error", e => {
+    try { log(JSON.parse(e.data).message, "err"); } catch { log("stream error", "err"); }
+  });
+  es.addEventListener("done", () => {
+    runningNode = null; $("#run").disabled = false; es.close(); es = null;
+    renderSteps(); log("done.");
+  });
+};
+</script>
+</body>
+</html>

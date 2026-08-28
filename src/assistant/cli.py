@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +11,7 @@ from dotenv import load_dotenv
 from assistant.config import get_settings
 from assistant.graph import build_graph
 from assistant.llm import build_llm, describe_llm
+from assistant.logs import configure_logging, logger
 from assistant.memory import empty_store, hydrate_from_view, load_memory_view, seed_defaults
 from assistant.models import MemoryView
 from assistant.state import RuntimeCtx
@@ -37,13 +37,17 @@ def _snapshot(store, user_id: str, data_dir: Path) -> None:
 
 def run_brief(*, as_of: datetime | None = None) -> dict:
     load_dotenv()
+    configure_logging()
     settings = get_settings()
     data_dir = Path(settings.data_dir)
     store = empty_store()
     _hydrate(store, settings.brief_user_id, data_dir)
     llm = build_llm()
-    print(f"[dag] config: llm={describe_llm(llm)} | keys read from .env "
-          f"(XAI_API_KEY {'set' if settings.xai_api_key else 'unset'})", file=sys.stderr)
+    logger.info(
+        "config: llm=%s | keys read from .env (XAI_API_KEY %s)",
+        describe_llm(llm),
+        "set" if settings.xai_api_key else "unset",
+    )
     graph = build_graph(llm, store=store)
     as_of = as_of or datetime.now(timezone.utc)
     request_id = str(uuid4())

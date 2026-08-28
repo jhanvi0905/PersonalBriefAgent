@@ -20,10 +20,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3.0"]
+web = ["fastapi>=0.115.0", "uvicorn>=0.30.0"]
 
 [project.scripts]
 brief = "assistant.cli:main"
 brief-auth = "assistant.cli:authorize"
+brief-web = "assistant.server:main"
 
 [build-system]
 requires = ["setuptools>=75.0"]
@@ -31,6 +33,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+assistant = ["web/*.html"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
