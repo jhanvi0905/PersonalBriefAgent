@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
 
 from langgraph.runtime import Runtime
 
+from assistant.config import get_settings
 from assistant.guardrails import pack_compose, pack_prioritize, rule_filter
 from assistant.llm import BriefLLM
 from assistant.memory import load_memory_view, persist_brief, seed_defaults
 from assistant.models import BriefItem
-from assistant.sources.calendar import sample_events
-from assistant.sources.email import sample_emails
+from assistant.sources.calendar import fetch_upcoming_events
+from assistant.sources.email import fetch_recent_emails
+from assistant.sources.google import CredentialsMissing, load_credentials
 from assistant.sources.news import fetch_news
 from assistant.state import BriefState, RuntimeCtx, memory_from_state
 
@@ -28,22 +32,38 @@ def load_memory(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
     return {"memory_view": view.model_dump(mode="json"), "status": "ok"}
 
 
-def fetch_emails(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
-    items = sample_emails(_as_of(runtime))
-    return {
-        "source_results": {
-            "email": {"ok": True, "items": [i.model_dump(mode="json") for i in items]}
+GoogleFetch = Callable[[datetime, object], list[BriefItem]]
+
+
+def _google_source(key: str, fetch: GoogleFetch, as_of: datetime) -> dict:
+    settings = get_settings()
+    try:
+        creds = load_credentials(
+            Path(settings.google_client_secrets), Path(settings.google_token_file)
+        )
+        items = fetch(as_of, creds)
+        return {
+            "source_results": {
+                key: {"ok": True, "items": [i.model_dump(mode="json") for i in items]}
+            }
         }
-    }
+    except CredentialsMissing:
+        return {"source_results": {key: {"ok": True, "items": []}}}
+    except Exception as exc:  # noqa: BLE001 — per-source isolation
+        return {
+            "source_results": {key: {"ok": False, "items": []}},
+            "skipped": [key],
+            "errors": [f"{key}:{exc.__class__.__name__}"],
+            "status": "partial",
+        }
+
+
+def fetch_emails(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
+    return _google_source("email", fetch_recent_emails, _as_of(runtime))
 
 
 def fetch_events(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
-    items = sample_events(_as_of(runtime))
-    return {
-        "source_results": {
-            "calendar": {"ok": True, "items": [i.model_dump(mode="json") for i in items]}
-        }
-    }
+    return _google_source("calendar", fetch_upcoming_events, _as_of(runtime))
 
 
 def fetch_ai_news(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:

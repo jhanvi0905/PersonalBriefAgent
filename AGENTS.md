@@ -8,12 +8,24 @@ LangGraph **workflow** (fixed DAG). Not a tool-calling agent. Grok ranks and wri
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env   # optional: XAI_API_KEY for Grok; otherwise heuristic LLM
+brief-auth             # optional: one-time Google consent for Gmail + Calendar
 brief
 # or: python -m assistant.cli
 pytest
 ```
 
 Without `XAI_API_KEY`, compose still runs via `HeuristicLLM`. With a key, `ChatXAI` (`XAI_MODEL`, default `grok-3-mini`) is used.
+
+### Google (Gmail + Calendar, read-only)
+
+1. Google Cloud console → new project → enable the Gmail API and Google Calendar API.
+2. OAuth consent screen: External, add your own address as a test user, scopes
+   `gmail.readonly` + `calendar.readonly`.
+3. Credentials → Create OAuth client ID → **Desktop app** → download JSON to
+   `credentials.json` (repo root).
+4. `brief-auth` opens a browser once and caches `data/google_token.json`.
+
+No token → `brief` still runs; email/calendar just come back empty.
 
 ## Layout
 
@@ -26,8 +38,9 @@ Without `XAI_API_KEY`, compose still runs via `HeuristicLLM`. With a key, `ChatX
 | `src/assistant/guardrails.py` | Sanitize, rule filter, salience cap, packs, fallback rank |
 | `src/assistant/nodes.py` | One function per DAG step |
 | `src/assistant/llm.py` | `BriefLLM` protocol: `GrokLLM` / `HeuristicLLM` |
-| `src/assistant/sources/email.py` | Stub inbox (swap for Gmail later) |
-| `src/assistant/sources/calendar.py` | Stub events (swap for Calendar later) |
+| `src/assistant/sources/google.py` | OAuth: `brief-auth` flow + token-only `load_credentials` |
+| `src/assistant/sources/email.py` | Gmail: inbox messages in the last 24h |
+| `src/assistant/sources/calendar.py` | Calendar: `primary` events in the next 24h |
 | `src/assistant/sources/news.py` | OpenAI RSS, Google Developers RSS (AI-only), Anthropic/Meta HTML |
 | `src/assistant/cli.py` | Entry + `data/memory.json` snapshot |
 | `src/assistant/config.py` | Budgets, feed list, settings |
@@ -46,7 +59,6 @@ Without `XAI_API_KEY`, compose still runs via `HeuristicLLM`. With a key, `ChatX
 
 ## Extend later
 
-- Real mail/calendar: replace the two stub modules; keep `BriefItem`.
 - More news: append `NEWS_FEEDS` in `config.py`.
 - Chat/agent: new graph that **reads** the store; do not turn this DAG into ReAct.
 - Delivery: Slack/email after `persist`, not inside Grok.

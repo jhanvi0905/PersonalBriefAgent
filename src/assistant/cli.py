@@ -82,5 +82,15 @@ def main() -> None:
     print(render(run_brief()), end="")
 
 
+def authorize() -> None:
+    """One-time Google OAuth consent; caches a token for Gmail + Calendar."""
+    load_dotenv()
+    settings = get_settings()
+    from assistant.sources.google import authorize as run_flow
+
+    run_flow(Path(settings.google_client_secrets), Path(settings.google_token_file))
+    print(f"Saved Google token to {settings.google_token_file}")
+
+
 if __name__ == "__main__":
     main()

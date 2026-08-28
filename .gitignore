@@ -220,3 +220,5 @@ __marimo__/
 # Project-specific
 data/
 .DS_Store
+credentials.json
+*token*.json

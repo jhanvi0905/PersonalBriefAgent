@@ -6,6 +6,8 @@ readme = "AGENTS.md"
 requires-python = ">=3.12"
 dependencies = [
   "feedparser>=6.0.11",
+  "google-api-python-client>=2.100.0",
+  "google-auth-oauthlib>=1.2.0",
   "httpx>=0.28.0",
   "langchain-core>=0.3.0",
   "langchain-xai>=0.2.0",
@@ -21,6 +23,7 @@ dev = ["pytest>=8.3.0"]
 
 [project.scripts]
 brief = "assistant.cli:main"
+brief-auth = "assistant.cli:authorize"
 
 [build-system]
 requires = ["setuptools>=75.0"]
