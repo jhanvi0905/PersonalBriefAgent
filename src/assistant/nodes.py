@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -8,7 +9,11 @@ from langgraph.runtime import Runtime
 
 from assistant.config import get_settings
 from assistant.guardrails import pack_compose, pack_prioritize, rule_filter
-from assistant.llm import BriefLLM
+from assistant.llm import BriefLLM, describe_llm
+
+
+def _log(step: str, msg: str) -> None:
+    print(f"[dag] {step}: {msg}", file=sys.stderr)
 from assistant.memory import load_memory_view, persist_brief, seed_defaults
 from assistant.models import BriefItem
 from assistant.sources.calendar import fetch_upcoming_events
@@ -42,14 +47,17 @@ def _google_source(key: str, fetch: GoogleFetch, as_of: datetime) -> dict:
             Path(settings.google_client_secrets), Path(settings.google_token_file)
         )
         items = fetch(as_of, creds)
+        _log(key, f"{len(items)} item(s) from Google ({settings.google_token_file})")
         return {
             "source_results": {
                 key: {"ok": True, "items": [i.model_dump(mode="json") for i in items]}
             }
         }
-    except CredentialsMissing:
+    except CredentialsMissing as exc:
+        _log(key, f"skipped — {exc} (source will be empty)")
         return {"source_results": {key: {"ok": True, "items": []}}}
     except Exception as exc:  # noqa: BLE001 — per-source isolation
+        _log(key, f"skipped — {exc.__class__.__name__}: {exc}")
         return {
             "source_results": {key: {"ok": False, "items": []}},
             "skipped": [key],
@@ -69,6 +77,8 @@ def fetch_events(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
 def fetch_ai_news(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
     try:
         items, skipped = fetch_news(_as_of(runtime))
+        _log("news", f"{len(items)} item(s) from RSS/HTML feeds"
+             + (f", skipped {skipped}" if skipped else ""))
         update: dict = {
             "source_results": {
                 "news": {
@@ -83,6 +93,7 @@ def fetch_ai_news(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
             update["status"] = "partial"
         return update
     except Exception as exc:  # noqa: BLE001
+        _log("news", f"failed — {exc.__class__.__name__}: {exc}")
         return {
             "source_results": {"news": {"ok": False, "items": []}},
             "skipped": ["news"],
@@ -121,10 +132,13 @@ def make_prioritize(llm: BriefLLM):
         cards = [ItemCard.model_validate(c) for c in state.get("prioritize_pack") or []]
         try:
             ranked = llm.prioritize(items, cards)
+            _log("prioritize", f"ranked {len(items)} candidate(s) via {describe_llm(llm)}")
             return {"ranked": [r.model_dump() for r in ranked]}
         except Exception as exc:  # noqa: BLE001
             from assistant.guardrails import fallback_rank
 
+            _log("prioritize", f"{describe_llm(llm)} failed ({exc.__class__.__name__}); "
+                 "using heuristic rule-order fallback")
             ranked = fallback_rank(items)
             return {
                 "ranked": [r.model_dump() for r in ranked],
@@ -154,12 +168,15 @@ def make_compose(llm: BriefLLM):
         status = state.get("status") or "ok"
         try:
             brief = llm.compose(pack, _as_of(runtime), runtime.context.model)
+            _log("compose", f"wrote brief via {describe_llm(llm)}")
             if status == "partial":
                 brief.status = "partial"
             return {"brief": brief.model_dump(mode="json"), "status": brief.status}
         except Exception as exc:  # noqa: BLE001
             from assistant.llm import HeuristicLLM
 
+            _log("compose", f"{describe_llm(llm)} failed ({exc.__class__.__name__}); "
+                 "using heuristic composer")
             brief = HeuristicLLM().compose(pack, _as_of(runtime), runtime.context.model)
             brief.status = "partial"
             return {

@@ -14,6 +14,10 @@ brief
 pytest
 ```
 
+All keys live in `.env` at the repo root (`cp .env.example .env`, then edit). Each run
+prints a `[dag] ...` trace to stderr showing the LLM, which endpoint, and per-source
+item counts / skips.
+
 Without `XAI_API_KEY`, compose still runs via `HeuristicLLM`. With a key, `ChatXAI` (`XAI_MODEL`, default `grok-3-mini`) is used. Set `XAI_API_BASE` to route through an OpenAI-compatible gateway such as aimlapi.com (`XAI_API_BASE=https://api.aimlapi.com/v1`, `XAI_MODEL=x-ai/grok-3-mini-beta`).
 
 ### Google (Gmail + Calendar, read-only)

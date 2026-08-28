@@ -23,8 +23,14 @@ class BriefLLM(Protocol):
     def compose(self, pack: ComposePack, as_of: datetime, model: str) -> BriefDocument: ...
 
 
+def describe_llm(llm: BriefLLM) -> str:
+    return getattr(llm, "name", type(llm).__name__)
+
+
 class HeuristicLLM:
     """Deterministic stand-in used in tests and when no API key is set."""
+
+    name = "HeuristicLLM (no XAI_API_KEY set)"
 
     def prioritize(self, items: list[BriefItem], cards: list[ItemCard]) -> list[RankedItem]:
         return fallback_rank(items)
@@ -51,6 +57,7 @@ class GrokLLM:
         from langchain_xai import ChatXAI
 
         self.model_name = model
+        self.name = f"GrokLLM model={model} endpoint={api_base or 'https://api.x.ai/v1'}"
         extra = {"xai_api_base": api_base} if api_base else {}
         self._chat = ChatXAI(
             model=model,
