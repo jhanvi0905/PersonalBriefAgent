@@ -375,11 +375,18 @@ $("#run").onclick = () => {
     let m = "stream error"; try { m = JSON.parse(e.data).message; } catch {}
     addLog(m, true); $("#log").classList.add("open");
   });
-  es.addEventListener("done", () => {
-    state.running = null; $("#run").disabled = false;
-    es.close(); es = null;
-    renderStages(); renderNodes(); addLog("done");
-  });
+  es.addEventListener("done", () => finish("done"));
+  // native connection drop: close so EventSource does NOT auto-reconnect
+  // (each reconnect would start a new graph run and spend credits)
+  es.onerror = () => { if (es && es.readyState === 2) finish("connection closed", true); };
+};
+
+function finish(msg, err) {
+  state.running = null;
+  $("#run").disabled = false;
+  if (es) { es.close(); es = null; }
+  renderStages(); renderNodes();
+  addLog(msg, err);
 };
 </script>
 </body>

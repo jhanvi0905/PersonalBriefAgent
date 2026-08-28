@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import queue
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,6 +37,10 @@ NODES = [
 _INDEX = Path(__file__).parent / "web" / "index.html"
 app = FastAPI(title="Personal Brief")
 
+# One graph run at a time. A dropped EventSource auto-reconnects, and each
+# reconnect would otherwise start a fresh run — i.e. spend LLM credits.
+_run_lock = threading.Lock()
+
 
 @app.get("/")
 def index() -> FileResponse:
@@ -56,6 +61,16 @@ class _QueueHandler(logging.Handler):
 
 
 def _run() -> "object":
+    if not _run_lock.acquire(blocking=False):
+        yield _sse("error", {"message": "a run is already in progress — ignoring duplicate request"})
+        return
+    try:
+        yield from _run_locked()
+    finally:
+        _run_lock.release()
+
+
+def _run_locked() -> "object":
     load_dotenv()
     configure_logging()
     settings = get_settings()
