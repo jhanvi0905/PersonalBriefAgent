@@ -54,8 +54,13 @@ def test_rule_filter_drops_seen_handled_muted_and_old_news():
         seen_ids=["email:seen"],
         handled_ids=[],
     )
-    kept = rule_filter(items, memory, as_of)
+    kept, discarded = rule_filter(items, memory, as_of)
     assert [i.id for i in kept] == ["email:ok"]
+    assert {i.id: why for i, why in discarded} == {
+        "news:old": "news older than 48h",
+        "email:1": "muted sender",
+        "email:seen": "already briefed",
+    }
 
 
 def test_merge_by_source_does_not_clobber():

@@ -43,23 +43,28 @@ def in_window(ts: datetime, as_of: datetime, hours: int = NEWS_WINDOW_HOURS) -> 
     return as_of - timedelta(hours=hours) <= ts <= as_of + timedelta(hours=1)
 
 
-def rule_filter(items: list[BriefItem], memory: MemoryView, as_of: datetime) -> list[BriefItem]:
+def rule_filter(
+    items: list[BriefItem], memory: MemoryView, as_of: datetime
+) -> tuple[list[BriefItem], list[tuple[BriefItem, str]]]:
+    """Returns (kept, [(item, why_discarded), ...])."""
     seen = set(memory.seen_ids)
     handled = set(memory.handled_ids)
     mutes = {m.lower() for m in memory.policy.mute_senders}
-    out: list[BriefItem] = []
+    kept: list[BriefItem] = []
+    discarded: list[tuple[BriefItem, str]] = []
     for item in items:
         if item.id in handled or item.id in seen:
+            discarded.append((item, "already briefed"))
             continue
         blob = f"{item.title} {item.summary}".lower()
         if any(m and m in blob for m in mutes):
+            discarded.append((item, "muted sender"))
             continue
         if item.source == Source.news and not in_window(item.timestamp, as_of):
+            discarded.append((item, "news older than 48h"))
             continue
-        item.seen = item.id in seen
-        item.handled = item.id in handled
-        out.append(item)
-    return out
+        kept.append(item)
+    return kept, discarded
 
 
 def salience(item: BriefItem) -> tuple:

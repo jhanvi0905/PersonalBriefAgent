@@ -116,24 +116,23 @@ def normalize(state: BriefState) -> dict:
 
 
 def apply_rules(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
-    from assistant.guardrails import in_window
-    from assistant.models import Source
+    from collections import Counter
 
     memory = memory_from_state(state)
-    as_of = _as_of(runtime)
     items = [BriefItem.model_validate(r) for r in state.get("items") or []]
-    kept = rule_filter(items, memory, as_of)
+    kept, discarded = rule_filter(items, memory, _as_of(runtime))
 
-    already = set(memory.seen_ids) | set(memory.handled_ids)
-    n_seen = sum(1 for i in items if i.id in already)
-    n_stale = sum(
-        1 for i in items
-        if i.source == Source.news and i.id not in already and not in_window(i.timestamp, as_of)
-    )
-    _log("rule_filter", f"kept {len(kept)}/{len(items)} "
-         f"(dropped {n_seen} already briefed, {n_stale} news older than 48h, "
-         f"{len(items) - len(kept) - n_seen - n_stale} muted/other)")
-    return {"candidates": [i.model_dump(mode="json") for i in kept]}
+    by_reason = Counter(reason for _, reason in discarded)
+    summary = ", ".join(f"{n} {r}" for r, n in by_reason.items()) or "none"
+    _log("rule_filter", f"kept {len(kept)}/{len(items)} — discarded: {summary}")
+    return {
+        "candidates": [i.model_dump(mode="json") for i in kept],
+        "discarded": [
+            {"id": it.id, "source": it.source.value, "title": it.title,
+             "url": it.url, "reason": reason}
+            for it, reason in discarded
+        ],
+    }
 
 
 def pack_for_rank(state: BriefState) -> dict:

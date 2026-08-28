@@ -51,7 +51,7 @@ No token → `brief` still runs; email/calendar just come back empty.
 | `src/assistant/state.py` | `RuntimeCtx` (immutable) vs `BriefState` (reducers) |
 | `src/assistant/memory.py` | LangGraph `Store`: prefs, ledger, digest |
 | `src/assistant/models.py` | Pydantic contracts (`BriefItem`, packs, brief) |
-| `src/assistant/guardrails.py` | Sanitize, rule filter, salience cap, packs, fallback rank |
+| `src/assistant/guardrails.py` | Sanitize, rule filter (→ kept + discarded), salience cap, packs, fallback rank |
 | `src/assistant/nodes.py` | One function per DAG step |
 | `src/assistant/llm.py` | `BriefLLM` protocol: `GrokLLM` / `HeuristicLLM` |
 | `src/assistant/sources/google.py` | OAuth: `brief-auth` flow + token-only `load_credentials` |

@@ -112,6 +112,10 @@
          background:var(--panel2); color:var(--dim); text-transform:uppercase; margin-top:2px; }
   .bar { height:5px; border-radius:3px; background:var(--acc); flex:none; align-self:center; }
   .muted { color:var(--faint); }
+  .subh { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+          color:var(--dim); margin:12px 0 2px; }
+  .fgap.link { cursor:pointer; }
+  .fgap.link:hover { color:var(--acc); }
   pre { margin:8px 0 0; white-space:pre-wrap; word-break:break-word; color:var(--dim);
         font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
         max-height:280px; overflow:auto; }
@@ -218,14 +222,19 @@ function renderFunnel() {
   const rank = count("prioritize", d => (d.ranked || []).filter(r => r.include).length);
   const brf = state.brief ? state.brief.item_ids.length : null;
   const row = (n, l) => `<div class="frow"><span class="n">${n ?? "–"}</span><span class="l">${l}</span></div>`;
-  const gap = t => `<div class='fgap'>↓${t ? ` <span class="muted">${t}</span>` : ""}</div>`;
+  const gap = (t, cls) => `<div class='fgap ${cls || ""}'>↓${t ? ` <span class="muted">${t}</span>` : ""}</div>`;
   const drop = (norm != null && cand != null) ? norm - cand : null;
+  const rankDrop = (cand != null && rank != null) ? cand - rank : null;
   $("#funnel").innerHTML =
     row(em, "📧 emails") + row(ev, "📅 events") + row(nw, "📰 news") + gap() +
-    row(norm, "collected") + gap(drop ? `−${drop} seen / >48h` : "") +
-    row(cand, "🔎 candidates") + gap() +
+    row(norm, "collected") + gap(drop ? `−${drop} discarded by rules` : "", drop ? "link" : "") +
+    row(cand, "🔎 candidates") + gap(rankDrop ? `−${rankDrop} set aside by model` : "", rankDrop ? "link2" : "") +
     row(rank, "★ ranked in") + gap() +
     row(brf, "✨ in brief");
+  const j = $("#funnel").querySelector(".link");
+  if (j) j.onclick = () => { state.selected = "rule_filter"; renderNodes(); renderMain(); };
+  const j2 = $("#funnel").querySelector(".link2");
+  if (j2) j2.onclick = () => { state.selected = "prioritize"; renderNodes(); renderMain(); };
 }
 
 /* ---------- node list ---------- */
@@ -297,16 +306,34 @@ function nodeDetail(n) {
     body = `<div class="kv"><dt>normalized</dt><dd>${d.items.length}</dd></div>
       <div class="list">${d.items.map(itemLine).join("")}</div>`;
   } else if (d.candidates) {
-    body = `<div class="kv"><dt>candidates</dt><dd>${d.candidates.length}</dd></div>
-      <div class="list">${d.candidates.map(itemLine).join("")}</div>`;
+    const disc = d.discarded || [];
+    const groups = {};
+    disc.forEach(x => (groups[x.reason] = groups[x.reason] || []).push(x));
+    const discHtml = Object.entries(groups).map(([reason, xs]) => `
+      <div class="subh">✕ ${escapeHtml(reason)} · ${xs.length}</div>
+      ${xs.map(x => `<div class="li muted"><span class="src">${SRC_ICON[x.source] || ""} ${x.source}</span>
+        <span>${escapeHtml(x.title)}${x.url ? ` <a href="${encodeURI(x.url)}" target="_blank">↗</a>` : ""}</span></div>`).join("")}`).join("");
+    body = `<div class="kv"><dt>kept</dt><dd>${d.candidates.length}</dd>
+        <dt>discarded</dt><dd>${disc.length}</dd></div>
+      <div class="subh">✓ kept · ${d.candidates.length}</div>
+      <div class="list">${d.candidates.map(itemLine).join("")}</div>
+      ${discHtml ? `<div class="list">${discHtml}</div>` : ""}`;
   } else if (d.prioritize_pack) {
     body = `<div class="kv"><dt>cards to model</dt><dd>${d.prioritize_pack.length}</dd></div>`;
   } else if (d.ranked) {
-    const rows = d.ranked.slice().sort((a,b) => a.rank - b.rank).map(r => `
-      <div class="li"><span class="src">${r.include ? "★" : "·"} ${r.score.toFixed(2)}</span>
+    const row = r => `
+      <div class="li ${r.include ? "" : "muted"}"><span class="src">${r.include ? "★" : "✕"} ${r.score.toFixed(2)}</span>
         <span><span class="bar" style="width:${Math.round(r.score*90)}px"></span><br>
-        <span class="muted">${escapeHtml(r.item_id)}</span><br>${escapeHtml(r.reason)}</span></div>`).join("");
-    body = `<div class="list">${rows || "<span class='muted'>nothing to rank</span>"}</div>`;
+        <span class="muted">${escapeHtml(r.item_id)}</span><br>${escapeHtml(r.reason)}</span></div>`;
+    const sorted = d.ranked.slice().sort((a,b) => a.rank - b.rank);
+    const keep = sorted.filter(r => r.include), drop = sorted.filter(r => !r.include);
+    body = `<div class="kv"><dt>ranked by model</dt><dd>${d.ranked.length}</dd>
+        <dt>kept for brief</dt><dd>${keep.length}</dd>
+        <dt>set aside</dt><dd>${drop.length}</dd></div>
+      <div class="subh">★ kept for brief</div>
+      <div class="list">${keep.map(row).join("") || "<span class='muted'>none</span>"}</div>
+      ${drop.length ? `<div class="subh">✕ set aside by model</div>
+        <div class="list">${drop.map(row).join("")}</div>` : ""}`;
   } else if (d.compose_pack) {
     const p = d.compose_pack;
     body = `<dl class="kv"><dt>winners</dt><dd>${(p.winners || []).length}</dd>

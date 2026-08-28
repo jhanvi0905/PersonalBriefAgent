@@ -29,6 +29,7 @@ class BriefState(TypedDict, total=False):
     source_results: Annotated[dict[str, Any], merge_by_source]
     items: list[dict]
     candidates: list[dict]
+    discarded: list[dict]
     ranked: list[dict]
     memory_view: dict
     prioritize_pack: list[dict]
