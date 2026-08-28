@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 MAX_RAW_PER_SOURCE = 8
 MAX_CANDIDATES_TO_LLM = 30
 MAX_BRIEF_ITEMS = 12
-MAX_NEWS_IN_BRIEF = 10  # cap on news items the prioritizer may include
+MAX_NEWS_IN_BRIEF = 10  # news items the prioritizer aims to include
+MIN_NEWS_IN_BRIEF = 3  # floor: top up from ranked news if the model includes fewer
 ITEM_SUMMARY_CHARS = 400
 NEWS_WINDOW_HOURS = 48
 GMAIL_LOOKBACK_HOURS = 24

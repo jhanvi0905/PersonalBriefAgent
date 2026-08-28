@@ -51,6 +51,24 @@ def test_pack_compose_collects_links_for_winners_with_urls():
     assert [(l.title, l.url) for l in pack.links] == [("Opus 5", "https://anthropic.com/news/opus-5")]
 
 
+def test_pack_compose_tops_up_news_to_the_floor():
+    as_of = datetime(2026, 8, 27, 15, tzinfo=timezone.utc)
+    items = [
+        BriefItem(id="email:a", source=Source.email, title="A", summary="s", timestamp=as_of),
+        *[
+            BriefItem(id=f"news:{n}", source=Source.news, title=f"N{n}", summary="s", timestamp=as_of)
+            for n in range(5)
+        ],
+    ]
+    ranked = [RankedItem(item_id="email:a", score=0.9, rank=1, reason="vip", include=True)]
+    ranked += [
+        RankedItem(item_id=f"news:{n}", score=0.5 - n * 0.05, rank=2 + n, reason="minor", include=False)
+        for n in range(5)
+    ]
+    winners = [c.id for c in pack_compose(items, ranked, MemoryView()).winners]
+    assert winners == ["email:a", "news:0", "news:1", "news:2"]  # floor of 3 news
+
+
 def test_graph_produces_brief_and_dedups_on_second_run(monkeypatch):
     def fake_news(state, runtime):
         return {

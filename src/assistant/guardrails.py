@@ -7,6 +7,7 @@ from assistant.config import (
     ITEM_SUMMARY_CHARS,
     MAX_BRIEF_ITEMS,
     MAX_CANDIDATES_TO_LLM,
+    MIN_NEWS_IN_BRIEF,
     NEWS_WINDOW_HOURS,
 )
 from assistant.models import (
@@ -101,9 +102,27 @@ def pack_compose(
     winners: list[ItemCard] = []
     reasons: dict[str, str] = {}
     links: list[BriefLink] = []
-    included = [r for r in ranked if r.include]
-    included.sort(key=lambda r: r.rank)
-    for row in included[: memory.policy.max_items]:
+
+    chosen = sorted((r for r in ranked if r.include), key=lambda r: r.rank)
+    chosen = chosen[: memory.policy.max_items]
+
+    # Floor on news: if the model kept fewer than MIN_NEWS_IN_BRIEF, top up
+    # from the best-ranked news it left out (personal picks are untouched).
+    def _is_news(r: RankedItem) -> bool:
+        item = by_id.get(r.item_id)
+        return bool(item and item.source == Source.news)
+
+    chosen_ids = {r.item_id for r in chosen}
+    have_news = sum(1 for r in chosen if _is_news(r))
+    if have_news < MIN_NEWS_IN_BRIEF:
+        spare_news = sorted(
+            (r for r in ranked if r.item_id not in chosen_ids and _is_news(r)),
+            key=lambda r: r.rank,
+        )
+        chosen += spare_news[: MIN_NEWS_IN_BRIEF - have_news]
+        chosen.sort(key=lambda r: r.rank)
+
+    for row in chosen:
         item = by_id.get(row.item_id)
         if not item:
             continue
