@@ -47,16 +47,18 @@ class HeuristicLLM:
 
 
 class GrokLLM:
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, api_base: str = ""):
         from langchain_xai import ChatXAI
 
         self.model_name = model
+        extra = {"xai_api_base": api_base} if api_base else {}
         self._chat = ChatXAI(
             model=model,
             api_key=api_key,
             temperature=0,
             max_tokens=1200,
             max_retries=2,
+            **extra,
         )
 
     def prioritize(self, items: list[BriefItem], cards: list[ItemCard]) -> list[RankedItem]:
@@ -110,7 +112,7 @@ class GrokLLM:
 def build_llm() -> BriefLLM:
     settings = get_settings()
     if settings.xai_api_key:
-        return GrokLLM(settings.xai_api_key, settings.xai_model)
+        return GrokLLM(settings.xai_api_key, settings.xai_model, settings.xai_api_base)
     return HeuristicLLM()
 
 

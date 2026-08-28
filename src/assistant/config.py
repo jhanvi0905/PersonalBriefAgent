@@ -67,6 +67,7 @@ class Settings(BaseSettings):
 
     xai_api_key: str = ""
     xai_model: str = "grok-3-mini"
+    xai_api_base: str = ""  # override for an OpenAI-compatible gateway (e.g. aimlapi.com)
     brief_user_id: str = "default"
     data_dir: str = "data"
     google_client_secrets: str = "credentials.json"
