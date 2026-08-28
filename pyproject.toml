@@ -1,0 +1,34 @@
+[project]
+name = "personal-assistant-agent"
+version = "0.1.0"
+description = "LangGraph morning-brief workflow"
+readme = "AGENTS.md"
+requires-python = ">=3.12"
+dependencies = [
+  "feedparser>=6.0.11",
+  "httpx>=0.28.0",
+  "langchain-core>=0.3.0",
+  "langchain-xai>=0.2.0",
+  "langgraph>=0.6.0",
+  "langgraph-checkpoint-sqlite>=2.0.0",
+  "pydantic>=2.10.0",
+  "pydantic-settings>=2.7.0",
+  "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0"]
+
+[project.scripts]
+brief = "assistant.cli:main"
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
