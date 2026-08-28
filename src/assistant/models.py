@@ -81,6 +81,11 @@ class BriefSection(BaseModel):
     bullets: list[str]
 
 
+class BriefLink(BaseModel):
+    title: str
+    url: str
+
+
 class BriefDocument(BaseModel):
     brief_id: str
     generated_at: datetime
@@ -89,6 +94,7 @@ class BriefDocument(BaseModel):
     item_ids: list[str]
     model: str
     status: Literal["ok", "partial", "failed"] = "ok"
+    links: list[BriefLink] = Field(default_factory=list)
 
 
 class ComposePack(BaseModel):
@@ -98,3 +104,4 @@ class ComposePack(BaseModel):
     followups: list[str] = Field(default_factory=list)
     winners: list[ItemCard] = Field(default_factory=list)
     reasons: dict[str, str] = Field(default_factory=dict)
+    links: list[BriefLink] = Field(default_factory=list)

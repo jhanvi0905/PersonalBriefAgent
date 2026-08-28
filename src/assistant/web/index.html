@@ -90,6 +90,9 @@
   .sec ul { margin:0; padding-left:2px; list-style:none; display:flex; flex-direction:column; gap:7px; }
   .sec li { padding-left:18px; position:relative; color:var(--fg); }
   .sec li::before { content:"›"; position:absolute; left:2px; color:var(--acc); font-weight:700; }
+  .sec ul.links li::before { content:"🔗"; font-size:11px; }
+  .sec a { color:var(--acc); text-decoration:none; }
+  .sec a:hover { text-decoration:underline; }
   .brief.skeleton { color:var(--dim); }
   .brief.skeleton h2 { color:var(--faint); }
 
@@ -254,11 +257,16 @@ function briefCard() {
   const secs = (b.sections || []).map(s => `
     <div class="sec"><h4><span class="ic">${sectionIcon(s.title)}</span>${escapeHtml(s.title)}</h4>
       <ul>${(s.bullets || []).map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`).join("");
+  const links = (b.links || []).length ? `
+    <div class="sec"><h4><span class="ic">🔗</span>Sources</h4>
+      <ul class="links">${b.links.map(l =>
+        `<li><a href="${encodeURI(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a></li>`
+      ).join("")}</ul></div>` : "";
   return `<div class="brief">
     <div class="top"><h2>${escapeHtml(b.headline)}</h2>
       <span class="badge ${b.status}">${b.status}</span></div>
     <div class="meta">${when} · ${b.item_ids.length} item${b.item_ids.length === 1 ? "" : "s"} · ${escapeHtml(b.model)}</div>
-    ${secs}</div>`;
+    ${secs}${links}</div>`;
 }
 
 function itemLine(i) {

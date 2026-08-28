@@ -11,6 +11,7 @@ from assistant.config import (
 )
 from assistant.models import (
     BriefItem,
+    BriefLink,
     ComposePack,
     ItemCard,
     MemoryView,
@@ -94,6 +95,7 @@ def pack_compose(
     by_id = {i.id: i for i in items}
     winners: list[ItemCard] = []
     reasons: dict[str, str] = {}
+    links: list[BriefLink] = []
     included = [r for r in ranked if r.include]
     included.sort(key=lambda r: r.rank)
     for row in included[: memory.policy.max_items]:
@@ -102,6 +104,8 @@ def pack_compose(
             continue
         winners.append(to_card(item))
         reasons[item.id] = row.reason
+        if item.url:
+            links.append(BriefLink(title=item.title, url=item.url))
     return ComposePack(
         profile=memory.profile,
         open_loops=[loop.text for loop in memory.open_loops],
@@ -109,6 +113,7 @@ def pack_compose(
         followups=memory.last_brief_digest.promised_followups,
         winners=winners,
         reasons=reasons,
+        links=links,
     )
 
 

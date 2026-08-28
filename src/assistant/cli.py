@@ -79,6 +79,11 @@ def render(result: dict) -> str:
         for bullet in section.get("bullets") or []:
             lines.append(f"- {bullet}")
         lines.append("")
+    if brief.get("links"):
+        lines.append("## Links")
+        for link in brief["links"]:
+            lines.append(f"- {link['title']} — {link['url']}")
+        lines.append("")
     if result.get("errors"):
         lines.append("notes: " + "; ".join(result["errors"]))
     return "\n".join(lines).strip() + "\n"

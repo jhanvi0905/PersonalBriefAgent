@@ -49,6 +49,7 @@ class HeuristicLLM:
             item_ids=item_ids,
             model=model,
             status="ok",
+            links=pack.links,
         )
 
 
@@ -116,6 +117,7 @@ class GrokLLM:
             item_ids=ids,
             model=model,
             status="ok",
+            links=pack.links,
         )
 
 
