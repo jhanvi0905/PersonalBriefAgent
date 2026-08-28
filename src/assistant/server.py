@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import queue
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -108,8 +110,24 @@ def _run() -> "object":
         logger.removeHandler(handler)
 
 
+def _replay(path: Path) -> "object":
+    """Re-emit a captured SSE file (set BRIEF_REPLAY=run.sse) — UI work, no credits."""
+    frame: list[str] = []
+    for line in path.read_text().splitlines(keepends=True):
+        frame.append(line)
+        if line.strip() == "":
+            yield "".join(frame)
+            frame = []
+            time.sleep(0.3)
+    if frame:
+        yield "".join(frame)
+
+
 @app.get("/api/run")
 def run() -> StreamingResponse:
+    replay = os.environ.get("BRIEF_REPLAY")
+    if replay and Path(replay).exists():
+        return StreamingResponse(_replay(Path(replay)), media_type="text/event-stream")
     return StreamingResponse(_run(), media_type="text/event-stream")
 
 

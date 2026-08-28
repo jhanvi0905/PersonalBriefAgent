@@ -17,9 +17,14 @@ pip install -e ".[web]" && brief-web   # http://127.0.0.1:8765 — watch the DAG
 ```
 
 `brief-web` serves one page ([`assistant/web/index.html`](src/assistant/web/index.html)):
-`GET /api/run` streams the graph over SSE (`stream_mode="updates"`), so each node
-lights up as it finishes, its output is shown, and the `[dag]` log tails live.
-No build step — vanilla JS, `EventSource`.
+`GET /api/run` streams the graph over SSE (`stream_mode="updates"`). The page shows a
+6-stage rail (Memory → Collect → Filter → Prioritize → Compose → Save), a source→brief
+funnel, the rendered brief, per-node detail, and the live `[dag]` log. Vanilla JS,
+`EventSource`, no build step.
+
+`BRIEF_REPLAY=path/to/run.sse brief-web` replays a captured stream instead of running
+the graph — iterate on the UI without spending LLM credits. Capture one with
+`curl -sN localhost:8765/api/run > run.sse` during a real run.
 
 All keys live in `.env` at the repo root (`cp .env.example .env`, then edit). Each run
 prints a `[dag] ...` trace to stderr showing the LLM, which endpoint, and per-source
