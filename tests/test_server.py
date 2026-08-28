@@ -24,3 +24,13 @@ def test_run_stream_covers_every_node(monkeypatch):
     assert events[0] == "config"
     assert events[-1] == "done"
     assert {"load_memory", "normalize", "compose", "persist"} <= nodes
+
+
+def test_graph_endpoint_returns_compiled_structure():
+    g = TestClient(server.app).get("/api/graph").json()
+    ids = [n["id"] for n in g["nodes"]]
+    assert "__start__" in ids and "compose" in ids
+    fanout = {e[1] for e in g["edges"] if e[0] == "load_memory"}
+    assert fanout == {"fetch_emails", "fetch_events", "fetch_news"}
+    assert "graph TD" in g["mermaid"]
+    assert [s["id"] for s in g["stages"]][0] == "memory"

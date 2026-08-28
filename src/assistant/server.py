@@ -1,8 +1,8 @@
-"""Tiny FastAPI wrapper that streams a brief run to the browser.
+"""Donna — a web explainer for the LangGraph brief workflow.
 
-`brief-web` -> http://127.0.0.1:8765 : one page that runs the graph, lights
-up each DAG node as it finishes, shows the data each node produced, and
-tails the `[dag]` log live. Same graph, store, and .env as the CLI.
+`brief-web` -> http://127.0.0.1:8765 : shows today's brief as cards, the
+actual compiled LangGraph beside it, and streams a run node-by-node over
+SSE. Same graph, store, and .env as the CLI.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from assistant.cli import _hydrate, _snapshot
 from assistant.config import get_settings
 from assistant.graph import build_graph
-from assistant.llm import build_llm, describe_llm
+from assistant.llm import HeuristicLLM, build_llm, describe_llm
 from assistant.logs import configure_logging, logger
 from assistant.memory import empty_store
 from assistant.state import RuntimeCtx
@@ -32,6 +32,28 @@ from assistant.state import RuntimeCtx
 NODES = [
     "load_memory", "fetch_emails", "fetch_events", "fetch_news", "normalize",
     "rule_filter", "pack_prioritize", "prioritize", "pack_compose", "compose", "persist",
+]
+
+# Named phases over the raw nodes, for the explainer.
+STAGES = [
+    {"id": "memory", "name": "Memory",
+     "blurb": "Load prefs, the seen-ledger, and yesterday's digest from the store.",
+     "nodes": ["load_memory"]},
+    {"id": "collect", "name": "Collect",
+     "blurb": "Fan out: Gmail, Calendar, and the news feeds run in parallel.",
+     "nodes": ["fetch_emails", "fetch_events", "fetch_news"]},
+    {"id": "filter", "name": "Filter",
+     "blurb": "Merge sources, then drop what's already briefed, muted, or stale.",
+     "nodes": ["normalize", "rule_filter"]},
+    {"id": "prioritize", "name": "Prioritize",
+     "blurb": "Pack compact cards; the model ranks them and marks what belongs.",
+     "nodes": ["pack_prioritize", "prioritize"]},
+    {"id": "compose", "name": "Compose",
+     "blurb": "Pack the winners; the model writes the brief in themed sections.",
+     "nodes": ["pack_compose", "compose"]},
+    {"id": "save", "name": "Save",
+     "blurb": "Persist the brief and add its items to the seen-ledger.",
+     "nodes": ["persist"]},
 ]
 
 _INDEX = Path(__file__).parent / "web" / "index.html"
@@ -45,6 +67,22 @@ _run_lock = threading.Lock()
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(_INDEX)
+
+
+@app.get("/api/graph")
+def graph_spec() -> dict:
+    """The compiled LangGraph — structure only, no LLM, no run."""
+    g = build_graph(HeuristicLLM()).get_graph()
+    stage_of = {n: s for s in STAGES for n in s["nodes"]}
+    return {
+        "nodes": [
+            {"id": n, "stage": stage_of.get(n, {}).get("id", "")}
+            for n in g.nodes
+        ],
+        "edges": [[e.source, e.target] for e in g.edges],
+        "stages": STAGES,
+        "mermaid": g.draw_mermaid(),
+    }
 
 
 def _sse(event: str, data: object) -> str:

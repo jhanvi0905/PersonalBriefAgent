@@ -16,11 +16,12 @@ pytest
 pip install -e ".[web]" && brief-web   # http://127.0.0.1:8765 — watch the DAG run
 ```
 
-`brief-web` serves one page ([`assistant/web/index.html`](src/assistant/web/index.html)):
-`GET /api/run` streams the graph over SSE (`stream_mode="updates"`). The page shows a
-6-stage rail (Memory → Collect → Filter → Prioritize → Compose → Save), a source→brief
-funnel, the rendered brief, per-node detail, and the live `[dag]` log. Vanilla JS,
-`EventSource`, no build step.
+`brief-web` serves **Donna** ([`assistant/web/index.html`](src/assistant/web/index.html)), a
+one-page explainer. Left: today's brief as themed cards with links folded into the card
+they belong to. Right: the actual compiled LangGraph (`get_graph()` → `/api/graph`),
+nodes grouped into 6 named stages, animating as `GET /api/run` streams the run over SSE.
+Click any node for its inputs/outputs and discards. Vanilla JS + `EventSource`, no build
+step; theme is blush/coral, Libre Bodoni + Public Sans (Google Fonts).
 
 `BRIEF_REPLAY=path/to/run.sse brief-web` replays a captured stream instead of running
 the graph — iterate on the UI without spending LLM credits. Capture one with
@@ -59,7 +60,7 @@ No token → `brief` still runs; email/calendar just come back empty.
 | `src/assistant/sources/calendar.py` | Calendar: `primary` events in the next 24h |
 | `src/assistant/sources/news.py` | OpenAI RSS, Google Developers RSS (AI-only), Anthropic/Meta HTML |
 | `src/assistant/cli.py` | Entry + `data/memory.json` snapshot |
-| `src/assistant/server.py` | `brief-web`: FastAPI + SSE stream of the run |
+| `src/assistant/server.py` | `brief-web` (Donna): `/api/graph` structure + `/api/run` SSE; `STAGES` |
 | `src/assistant/logs.py` | One `assistant` logger; CLI → stderr, web → SSE |
 | `src/assistant/config.py` | Budgets, feed list, settings |
 | `tests/` | Mirrors the above; graph tests mock live news |
