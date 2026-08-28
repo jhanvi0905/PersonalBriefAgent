@@ -107,13 +107,32 @@ def normalize(state: BriefState) -> dict:
     for payload in results.values():
         for row in payload.get("items") or []:
             items.append(BriefItem.model_validate(row))
+    by_src: dict[str, int] = {}
+    for i in items:
+        by_src[i.source.value] = by_src.get(i.source.value, 0) + 1
+    _log("normalize", f"{len(items)} item(s) merged "
+         + ", ".join(f"{v} {k}" for k, v in sorted(by_src.items())))
     return {"items": [i.model_dump(mode="json") for i in items], "source_results": {}}
 
 
 def apply_rules(state: BriefState, runtime: Runtime[RuntimeCtx]) -> dict:
+    from assistant.guardrails import in_window
+    from assistant.models import Source
+
     memory = memory_from_state(state)
+    as_of = _as_of(runtime)
     items = [BriefItem.model_validate(r) for r in state.get("items") or []]
-    kept = rule_filter(items, memory, _as_of(runtime))
+    kept = rule_filter(items, memory, as_of)
+
+    already = set(memory.seen_ids) | set(memory.handled_ids)
+    n_seen = sum(1 for i in items if i.id in already)
+    n_stale = sum(
+        1 for i in items
+        if i.source == Source.news and i.id not in already and not in_window(i.timestamp, as_of)
+    )
+    _log("rule_filter", f"kept {len(kept)}/{len(items)} "
+         f"(dropped {n_seen} already briefed, {n_stale} news older than 48h, "
+         f"{len(items) - len(kept) - n_seen - n_stale} muted/other)")
     return {"candidates": [i.model_dump(mode="json") for i in kept]}
 
 

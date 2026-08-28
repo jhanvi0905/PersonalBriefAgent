@@ -215,12 +215,13 @@ function renderFunnel() {
   const rank = count("prioritize", d => (d.ranked || []).filter(r => r.include).length);
   const brf = state.brief ? state.brief.item_ids.length : null;
   const row = (n, l) => `<div class="frow"><span class="n">${n ?? "–"}</span><span class="l">${l}</span></div>`;
-  const gap = "<div class='fgap'>↓</div>";
+  const gap = t => `<div class='fgap'>↓${t ? ` <span class="muted">${t}</span>` : ""}</div>`;
+  const drop = (norm != null && cand != null) ? norm - cand : null;
   $("#funnel").innerHTML =
-    row(em, "📧 emails") + row(ev, "📅 events") + row(nw, "📰 news") + gap +
-    row(norm, "collected") + gap +
-    row(cand, "🔎 candidates") + gap +
-    row(rank, "★ ranked in") + gap +
+    row(em, "📧 emails") + row(ev, "📅 events") + row(nw, "📰 news") + gap() +
+    row(norm, "collected") + gap(drop ? `−${drop} seen / >48h` : "") +
+    row(cand, "🔎 candidates") + gap() +
+    row(rank, "★ ranked in") + gap() +
     row(brf, "✨ in brief");
 }
 
