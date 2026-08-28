@@ -175,6 +175,7 @@ def pack_for_write(state: BriefState) -> dict:
 
     ranked = [RankedItem.model_validate(r) for r in state.get("ranked") or []]
     pack = pack_compose(items, ranked, memory)
+    pack.owner = get_settings().brief_owner_name
     return {"compose_pack": pack.model_dump()}
 
 

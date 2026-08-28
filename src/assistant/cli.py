@@ -82,7 +82,10 @@ def render(result: dict) -> str:
     if brief.get("links"):
         lines.append("## Links")
         for link in brief["links"]:
-            lines.append(f"- {link['title']} — {link['url']}")
+            lines.append(f"- {link['title']}: {link['url']}")
+        lines.append("")
+    if brief.get("signoff"):
+        lines.append(brief["signoff"])
         lines.append("")
     if result.get("errors"):
         lines.append("notes: " + "; ".join(result["errors"]))

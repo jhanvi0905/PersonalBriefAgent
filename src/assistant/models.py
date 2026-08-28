@@ -89,15 +89,17 @@ class BriefLink(BaseModel):
 class BriefDocument(BaseModel):
     brief_id: str
     generated_at: datetime
-    headline: str
-    sections: list[BriefSection]
+    headline: str  # Donna's greeting line
+    sections: list[BriefSection]  # ordered: Needs you, Good to know, In AI news
     item_ids: list[str]
     model: str
     status: Literal["ok", "partial", "failed"] = "ok"
     links: list[BriefLink] = Field(default_factory=list)
+    signoff: str = ""
 
 
 class ComposePack(BaseModel):
+    owner: str = ""
     profile: str = ""
     open_loops: list[str] = Field(default_factory=list)
     last_headlines: list[str] = Field(default_factory=list)

@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     xai_model: str = "grok-3-mini"
     xai_api_base: str = ""  # override for an OpenAI-compatible gateway (e.g. aimlapi.com)
     brief_user_id: str = "default"
+    brief_owner_name: str = ""  # Donna addresses the reader by this name if set
     data_dir: str = "data"
     google_client_secrets: str = "credentials.json"
     google_token_file: str = "data/google_token.json"
